@@ -58,8 +58,9 @@ def download_model():
 
 @st.cache_resource(show_spinner=False)
 def ensure_model_cached():
+    # best.onnx 已随仓库部署，无需下载
     if not MODEL_PATH.exists():
-        return download_model()
+        return download_model()  # 保留兜底下载逻辑
     return True
 
 # ── Optional imports ───────────────────────────────────────────────────────────
@@ -495,6 +496,14 @@ def run_inference(session, pil_img: Image.Image, conf_thr=0.25):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  图像绘制
+
+def pil_to_data_url(pil_img: Image.Image) -> str:
+    """PIL Image → base64 data URL，用于 st_canvas background_image_url"""
+    buf = io.BytesIO()
+    pil_img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/png;base64,{b64}"
+
 # ══════════════════════════════════════════════════════════════════════════════
 def draw_kp_on_image(pil_img: Image.Image, kp_xy: np.ndarray,
                      kp_conf: np.ndarray = None, radius=6) -> Image.Image:
@@ -842,10 +851,14 @@ def main():
                     init_json = kp_to_fabric_json(
                         kp_xy, kp_conf, display_w, display_h, ow, oh
                     )
+                    # 将图像转为 base64 URL（兼容 Streamlit 1.55+）
+                    bg_url = pil_to_data_url(
+                        pil_img.resize((display_w, display_h))
+                    )
                     canvas_result = st_canvas(
                         fill_color="rgba(0,0,0,0)",
                         stroke_width=2,
-                        background_image=pil_img,
+                        background_image_url=bg_url,
                         update_streamlit=True,
                         height=display_h,
                         width=display_w,
