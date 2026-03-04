@@ -842,42 +842,60 @@ def main():
                 display_w = min(750, ow)
                 display_h = int(display_w * oh / ow)
 
-                # 标注图预览
-                annotated_preview = draw_kp_on_image(pil_img, kp_xy, kp_conf, kp_radius)
+                # ── 坐标编辑表格（实时更新预览）──
+                st.caption("📝 直接在表格中修改 X/Y 坐标，标注图实时更新")
+                df_kp = pd.DataFrame({
+                    "关键点": KP_NAMES,
+                    "X (px)": np.round(kp_xy[:,0], 1),
+                    "Y (px)": np.round(kp_xy[:,1], 1),
+                    "置信度": np.round(kp_conf, 3),
+                })
+                edited = st.data_editor(
+                    df_kp,
+                    use_container_width=True,
+                    num_rows="fixed",
+                    column_config={
+                        "关键点": st.column_config.TextColumn(disabled=True),
+                        "置信度": st.column_config.NumberColumn(
+                            disabled=True, format="%.3f"),
+                        "X (px)": st.column_config.NumberColumn(
+                            format="%.1f", step=0.5),
+                        "Y (px)": st.column_config.NumberColumn(
+                            format="%.1f", step=0.5),
+                    },
+                    key="kp_table",
+                    height=320,
+                )
+
+                # 从表格实时读取坐标（无需点击应用）
+                edited_kp = np.column_stack([
+                    edited["X (px)"].values.astype(float),
+                    edited["Y (px)"].values.astype(float),
+                ])
+
+                # 保存按钮（将编辑写回 session_state）
+                if st.button("💾 保存编辑结果", type="primary",
+                             use_container_width=True):
+                    st.session_state["kp_xy"] = edited_kp.copy()
+                    st.session_state.pop("kp_table", None)  # 清除缓存
+                    st.success("✅ 关键点已保存")
+                    st.rerun()
+
+                if st.button("↩️ 重置为检测结果", use_container_width=True):
+                    st.session_state.pop("kp_table", None)
+                    st.rerun()
+
+                # ── 实时标注图（使用表格当前值，非保存值）──
+                st.markdown('<div class="section-title">🖼️ 实时标注预览</div>',
+                            unsafe_allow_html=True)
+                annotated_preview = draw_kp_on_image(
+                    pil_img, edited_kp, kp_conf, kp_radius)
                 st.image(annotated_preview, use_container_width=True,
-                         caption="关键点检测结果（可在下方表格中精确编辑坐标）")
+                         caption="实时预览（修改表格后立即更新）")
 
-                # ── 精细坐标编辑表格 ──
-                with st.expander("🔢 关键点坐标精细编辑（数值调整）", expanded=False):
-                    df_kp = pd.DataFrame({
-                        "关键点": KP_NAMES,
-                        "X (px)": np.round(kp_xy[:,0], 1),
-                        "Y (px)": np.round(kp_xy[:,1], 1),
-                        "置信度": np.round(kp_conf, 3),
-                    })
-                    edited = st.data_editor(
-                        df_kp,
-                        use_container_width=True,
-                        num_rows="fixed",
-                        column_config={
-                            "关键点": st.column_config.TextColumn(disabled=True),
-                            "置信度": st.column_config.NumberColumn(disabled=True, format="%.3f"),
-                        },
-                        key="kp_table"
-                    )
-                    if st.button("📥 应用表格修改", use_container_width=True):
-                        new_kp = np.column_stack([
-                            edited["X (px)"].values.astype(float),
-                            edited["Y (px)"].values.astype(float),
-                        ])
-                        st.session_state["kp_xy"] = new_kp
-                        st.success("坐标已更新")
-                        st.rerun()
-
-                # 生成并缓存标注图
-                annotated_img = draw_kp_on_image(pil_img, st.session_state["kp_xy"],
-                                                 kp_conf, kp_radius)
-                st.session_state["annotated_img"] = annotated_img
+                # 缓存实时标注图（使用表格当前编辑值）
+                st.session_state["annotated_img"] = annotated_preview
+                st.session_state["kp_xy_live"] = edited_kp
 
     # ────────────────────────────────────────────────────────────────────────
     # Tab 2: 指标测量
@@ -889,6 +907,8 @@ def main():
             st.info("🔙 请在左侧边栏选择要计算的测量指标")
         else:
             kp_xy = st.session_state["kp_xy"]
+            # 优先使用实时编辑值（表格修改后立即反映）
+            kp_xy = st.session_state.get("kp_xy_live", kp_xy)
             kp_ext = st.session_state.get("kp_xy_ext", None)
             all_res = compute_measurements(kp_xy, kp_ext=kp_ext, selected=selected_meas)
             st.session_state["meas_results"] = all_res
