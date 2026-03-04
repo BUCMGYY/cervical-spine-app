@@ -70,11 +70,8 @@ try:
 except ImportError:
     HAS_ORT = False
 
-try:
-    from streamlit_drawable_canvas import st_canvas
-    HAS_CANVAS = True
-except ImportError:
-    HAS_CANVAS = False
+# streamlit-drawable-canvas removed for compatibility
+HAS_CANVAS = False
 
 try:
     from reportlab.lib.pagesizes import A4
@@ -845,48 +842,10 @@ def main():
                 display_w = min(750, ow)
                 display_h = int(display_w * oh / ow)
 
-                if HAS_CANVAS:
-                    st.caption("💡 选择 **transform** 模式后点选圆点可拖动调整；编辑完成点击「✅ 应用编辑」")
-
-                    init_json = kp_to_fabric_json(
-                        kp_xy, kp_conf, display_w, display_h, ow, oh
-                    )
-                    canvas_result = st_canvas(
-                        fill_color="rgba(0,0,0,0)",
-                        stroke_width=2,
-                        background_image=pil_img,
-                        update_streamlit=True,
-                        height=display_h,
-                        width=display_w,
-                        drawing_mode="transform",
-                        initial_drawing=init_json,
-                        key=st.session_state.get("canvas_key","canvas_init"),
-                        display_toolbar=True,
-                        point_display_radius=7,
-                    )
-
-                    if canvas_result.json_data and canvas_result.json_data.get("objects"):
-                        new_kp = fabric_to_kp(
-                            canvas_result.json_data, display_w, display_h, ow, oh
-                        )
-                        st.session_state["kp_xy_draft"] = new_kp
-
-                    bcol1, bcol2 = st.columns(2)
-                    if bcol1.button("✅ 应用拖动编辑", use_container_width=True):
-                        if "kp_xy_draft" in st.session_state:
-                            st.session_state["kp_xy"] = st.session_state["kp_xy_draft"].copy()
-                            st.success("关键点已更新")
-                            st.rerun()
-                    if bcol2.button("↩️ 重置为检测结果", use_container_width=True):
-                        st.session_state.pop("kp_xy_draft", None)
-                        st.session_state["canvas_key"] = str(datetime.datetime.now().timestamp())
-                        st.rerun()
-
-                else:
-                    # 降级显示：静态标注图
-                    st.warning("安装 `streamlit-drawable-canvas` 可启用交互拖拽编辑")
-                    annotated = draw_kp_on_image(pil_img, kp_xy, kp_conf, kp_radius)
-                    st.image(annotated, use_container_width=True)
+                # 标注图预览
+                annotated_preview = draw_kp_on_image(pil_img, kp_xy, kp_conf, kp_radius)
+                st.image(annotated_preview, use_container_width=True,
+                         caption="关键点检测结果（可在下方表格中精确编辑坐标）")
 
                 # ── 精细坐标编辑表格 ──
                 with st.expander("🔢 关键点坐标精细编辑（数值调整）", expanded=False):
