@@ -851,14 +851,10 @@ def main():
                     init_json = kp_to_fabric_json(
                         kp_xy, kp_conf, display_w, display_h, ow, oh
                     )
-                    # 将图像转为 base64 URL（兼容 Streamlit 1.55+）
-                    bg_url = pil_to_data_url(
-                        pil_img.resize((display_w, display_h))
-                    )
                     canvas_result = st_canvas(
                         fill_color="rgba(0,0,0,0)",
                         stroke_width=2,
-                        background_image_url=bg_url,
+                        background_image=pil_img,
                         update_streamlit=True,
                         height=display_h,
                         width=display_w,
